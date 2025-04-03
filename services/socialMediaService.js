@@ -11,10 +11,9 @@ const client = new ApifyClient({
 const ensurePublicDirectory = async () => {
     const publicDir = path.join(__dirname, '../public');
     try {
-        await fs.mkdir(publicDir, { recursive: true });
-    } catch (error) {
-        console.error('Error creating public directory:', error);
-        throw error;
+        await fs.access(publicDir);
+    } catch {
+        await fs.mkdir(publicDir, { recursive: true, mode: 0o755 });
     }
 };
 
