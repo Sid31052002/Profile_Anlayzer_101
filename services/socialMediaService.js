@@ -2,6 +2,7 @@ const { ApifyClient } = require('apify-client');
 const fs = require('fs').promises;
 const path = require('path');
 require('dotenv').config();
+const { generateAltText } = require('./imageService');
 
 const client = new ApifyClient({
     token: process.env.APIFY_API_TOKEN,
@@ -81,6 +82,28 @@ const scrapeTwitterProfile = async (profileUrl, sinceDate = "2024-03-05", result
     }
 };
 
+// Add the flatten function
+const flattenDict = (d, parentKey = "", sep = ".", arraySeparator = ", ") => {
+    if (!d) return {};
+    const items = [];
+    for (const [k, v] of Object.entries(d)) {
+        const newKey = parentKey ? `${parentKey}${sep}${k}` : k;
+        if (v && typeof v === "object" && !Array.isArray(v)) {
+            items.push(...Object.entries(flattenDict(v, newKey, sep, arraySeparator)));
+        } else if (Array.isArray(v)) {
+            const processedArray = v.map((item) =>
+                item && typeof item === "object"
+                    ? JSON.stringify(item, null, 2)
+                    : String(item)
+            );
+            items.push([newKey, processedArray.join(arraySeparator)]);
+        } else {
+            items.push([newKey, v]);
+        }
+    }
+    return Object.fromEntries(items);
+};
+
 const scrapeInstagramProfile = async (profileUrl) => {
     try {
         if (!profileUrl) {
@@ -101,29 +124,49 @@ const scrapeInstagramProfile = async (profileUrl) => {
 
         const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
-        console.log('========= Instagram Scraping Results =========');
-        console.log('Number of items found:', items.length);
-        items.forEach((item, index) => {
-            console.log(`\nPost ${index + 1}:`);
-            console.log('Display URL:', item.displayUrl);
-            console.log('Caption:', item.text);
-            console.log('Likes:', item.likesCount);
-            console.log('Comments:', item.commentsCount);
-            console.log('Timestamp:', item.timestamp);
-            console.log('----------------------------------------');
-        });
+        // Process posts with only required fields
+        let textSummary = '';
+        const processedPosts = [];
 
-        const imageUrls = items.map(item => item.displayUrl);
-        const profileId = profileUrl.split('/').pop();
-        const jsonFilename = await saveImagesJson(imageUrls, 'instagram', profileId);
+        for (let i = 0; i < items.length; i++) {
+            const item = items[i];
+            const imageDescription = await generateAltText(item.displayUrl);
+            
+            // Flatten the item object
+            const flattenedItem = flattenDict(item);
+            
+            // Create post with flattened data
+            const post = {
+                username: flattenedItem['owner.username'] || 'N/A',
+                fullName: flattenedItem['owner.fullName'] || 'N/A',
+                caption: flattenedItem['text'] || 'No caption',
+                alt: flattenedItem['alt'] || 'No alt text',
+                image_url: flattenedItem['displayUrl'],
+                description: imageDescription
+            };
+
+            processedPosts.push(post);
+
+            // Add to text summary
+            textSummary += `Post ${i + 1}:\n`;
+            textSummary += `Username: ${post.username}\n`;
+            textSummary += `Full Name: ${post.fullName}\n`;
+            textSummary += `Caption: ${post.caption}\n`;
+            textSummary += `Alt: ${post.alt}\n`;
+            textSummary += `Image URL: ${post.image_url}\n`;
+            textSummary += `Description:\n${post.description}\n`;
+            textSummary += '----------------------------------------\n\n';
+        }
+
+        // Save text summary
+        const textFileName = `instagram_summary_${Date.now()}.txt`;
+        const publicDir = path.join(__dirname, '../public');
+        await fs.writeFile(path.join(publicDir, textFileName), textSummary, 'utf8');
 
         return {
-            datasetUrl: `https://console.apify.com/storage/datasets/${run.defaultDatasetId}`,
-            posts: items.map((item, index) => ({
-                index: index + 1,
-                imageUrl: item.displayUrl,
-            })),
-            jsonFile: jsonFilename
+            posts: processedPosts,
+            textSummary: textFileName,
+            textContent: textSummary
         };
     } catch (error) {
         console.error('Error scraping profile:', error.message);

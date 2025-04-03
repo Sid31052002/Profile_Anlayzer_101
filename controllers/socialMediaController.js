@@ -14,7 +14,7 @@ const getTwitterMedia = async (req, res) => {
 
 const getInstagramPosts = async (req, res) => {
     try {
-        const { profileUrl } = req.query;node 
+        const { profileUrl } = req.query;
         if (!profileUrl) {
             return res.status(400).json({ success: false, error: "Missing profileUrl parameter" });
         }
@@ -56,19 +56,12 @@ const processProfileUrl = async (req, res) => {
             return res.status(400).json({ success: false, error: "Invalid social media URL" });
         }
 
-        // Remove success check since Instagram scraper doesn't return success flag
-        const jsonFile = scrapingResult.jsonFile;
-        if (!jsonFile) {
-            return res.status(500).json({ success: false, error: "No images found to analyze" });
-        }
-
-        // Analyze the images
-        const analysisResult = await analyzeImagesFromJson(jsonFile);
-        
         res.json({
             success: true,
-            scraping: scrapingResult,
-            analysis: analysisResult
+            data: {
+                posts: scrapingResult.posts,
+                textContent: scrapingResult.textContent
+            }
         });
     } catch (error) {
         console.error('Error processing URL:', error);
