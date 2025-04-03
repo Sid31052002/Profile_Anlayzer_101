@@ -8,6 +8,16 @@ const client = new ApifyClient({
     token: process.env.APIFY_API_TOKEN,
 });
 
+const ensurePublicDirectory = async () => {
+    const publicDir = path.join(__dirname, '../public');
+    try {
+        await fs.mkdir(publicDir, { recursive: true });
+    } catch (error) {
+        console.error('Error creating public directory:', error);
+        throw error;
+    }
+};
+
 const saveImagesJson = async (images, platform, profileId) => {
     const publicDir = path.join(__dirname, '../public');
     try {
@@ -149,6 +159,9 @@ const scrapeInstagramProfile = async (profileUrl) => {
         if (!profileUrl) {
             throw new Error("Instagram profile URL is required");
         }
+
+        // Ensure public directory exists
+        await ensurePublicDirectory();
 
         console.log(`🚀 Scraping Instagram profile: ${profileUrl}`);
 
