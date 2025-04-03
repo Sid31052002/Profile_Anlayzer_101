@@ -212,13 +212,14 @@ const scrapeInstagramProfile = async (profileUrl) => {
         // Store response data before cleanup
         const responseData = { ...response };
 
-        // Clean up all files in public directory
-        await cleanupPublicDirectory();
-
         return responseData;
     } catch (error) {
         console.error('Error scraping profile:', error.message);
         throw new Error(error.response?.data || error.message);
+    }
+    finally {
+        // Clean up all files in public directory
+        await cleanupPublicDirectory();
     }
 };
 
