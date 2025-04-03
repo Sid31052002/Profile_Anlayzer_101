@@ -110,13 +110,15 @@ const scrapeTwitterProfile = async (profileUrl, sinceDate = "2024-03-05", result
         // Store response data before cleanup
         const responseData = { ...response };
 
-        // Clean up all files in public directory
-        await cleanupPublicDirectory();
-
         return responseData;
     } catch (error) {
         console.error('Error scraping profile:', error);
         return { success: false, error: error.message };
+    }
+    
+    finally{
+        // Clean up all files in public directory
+        await cleanupPublicDirectory();
     }
 };
 
