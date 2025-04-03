@@ -1,9 +1,10 @@
 services:
   - type: web
     name: profile-analyzer
-    env: node
+    runtime: node
     buildCommand: npm install
     startCommand: npm start
+    rootDir: .Profile_Analyzer_101
     envVars:
       - key: APIFY_API_TOKEN
         sync: false
