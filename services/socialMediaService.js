@@ -51,32 +51,69 @@ const scrapeTwitterProfile = async (profileUrl, sinceDate = "2024-03-05", result
         const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
         const mediaUrls = [];
-        items.forEach((item) => {
-            if (item.extended_entities && item.extended_entities.media) {
-                item.extended_entities.media.forEach(media => {
-                    if (media.media_url_https) {
+        const processedTweets = [];
+        let textSummary = '';
+        let imageCount = 0;
+
+        // Process each tweet and its media
+        for (let i = 0; i < items.length && imageCount < 10; i++) {
+            const item = items[i];
+            const tweetMedia = [];
+
+            // Extract media URLs
+            if (item.extended_entities?.media) {
+                for (const media of item.extended_entities.media) {
+                    if (media.media_url_https && imageCount < 10) {
                         mediaUrls.push(media.media_url_https);
+                        const imageDescription = await generateAltText(media.media_url_https);
+                        tweetMedia.push({
+                            url: media.media_url_https,
+                            description: imageDescription
+                        });
+                        imageCount++;
                     }
-                });
-            } else if (item.entities && item.entities.media) {
-                item.entities.media.forEach(media => {
-                    if (media.media_url_https) {
-                        mediaUrls.push(media.media_url_https);
-                    }
-                });
+                }
             }
-        });
-        
+
+            const tweet = {
+                text: item.full_text,
+                media: tweetMedia
+            };
+            processedTweets.push(tweet);
+
+            // Add to text summary
+            textSummary += `Tweet ${i + 1}:\n`;
+            textSummary += `Text: ${tweet.text}\n`;
+            tweet.media.forEach((media, index) => {
+                textSummary += `Image ${index + 1} URL: ${media.url}\n`;
+                textSummary += `Description:\n${media.description}\n`;
+            });
+            textSummary += '----------------------------------------\n\n';
+        }
+
         const profileId = profileUrl.split('/').pop();
         const jsonFilename = await saveImagesJson(mediaUrls, 'twitter', profileId);
+        const textFileName = `twitter_summary_${Date.now()}.txt`;
+        const publicDir = path.join(__dirname, '../public');
+        await fs.writeFile(path.join(publicDir, textFileName), textSummary, 'utf8');
 
-        return {    
-            tweets: items.map((tweet) => ({text: tweet.full_text})),
-            success: true, 
+        const response = {
+            tweets: processedTweets,
+            success: true,
             datasetUrl: `https://console.apify.com/storage/datasets/${run.defaultDatasetId}`,
             mediaUrls,
-            jsonFile: jsonFilename 
+            jsonFile: jsonFilename,
+            textSummary: textFileName,
+            textContent: textSummary
         };
+
+        // Store response data before cleanup
+        const responseData = { ...response };
+
+        // Clean up all files in public directory
+        await cleanupPublicDirectory();
+
+        return responseData;
     } catch (error) {
         console.error('Error scraping profile:', error);
         return { success: false, error: error.message };
@@ -164,15 +201,39 @@ const scrapeInstagramProfile = async (profileUrl) => {
         const publicDir = path.join(__dirname, '../public');
         await fs.writeFile(path.join(publicDir, textFileName), textSummary, 'utf8');
 
-        return {
+        const response = {
             posts: processedPosts,
             textSummary: textFileName,
             textContent: textSummary
         };
+
+        // Store response data before cleanup
+        const responseData = { ...response };
+
+        // Clean up all files in public directory
+        await cleanupPublicDirectory();
+
+        return responseData;
     } catch (error) {
         console.error('Error scraping profile:', error.message);
         throw new Error(error.response?.data || error.message);
     }
 };
 
-module.exports = { scrapeTwitterProfile, scrapeInstagramProfile };
+const cleanupPublicDirectory = async () => {
+    const publicDir = path.join(__dirname, '../public');
+    try {
+        const files = await fs.readdir(publicDir);
+        for (const file of files) {
+            try {
+                await fs.unlink(path.join(publicDir, file));
+            } catch (error) {
+                console.error(`Error deleting file ${file}:`, error);
+            }
+        }
+    } catch (error) {
+        console.error('Error cleaning public directory:', error);
+    }
+};
+
+module.exports = { scrapeTwitterProfile, scrapeInstagramProfile, cleanupPublicDirectory };
