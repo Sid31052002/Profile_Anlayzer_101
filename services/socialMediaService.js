@@ -45,7 +45,7 @@ const scrapeTwitterProfile = async (profileUrl, sinceDate = "2024-03-05", result
         };
 
         const run = await client.actor("gentle_cloud/twitter-tweets-scraper").call(input);
-        console.log(`💾 Check your data here: https://console.apify.com/storage/datasets/${run.defaultDatasetId}`);
+        console.log(` Check your data here: https://console.apify.com/storage/datasets/${run.defaultDatasetId}`);
 
         const { items } = await client.dataset(run.defaultDatasetId).listItems();
 
@@ -65,13 +65,14 @@ const scrapeTwitterProfile = async (profileUrl, sinceDate = "2024-03-05", result
                 });
             }
         });
-
+        
         const profileId = profileUrl.split('/').pop();
         const jsonFilename = await saveImagesJson(mediaUrls, 'twitter', profileId);
 
-        return { 
+        return {    
+            tweets: items.map((tweet) => ({text: tweet.full_text})),
             success: true, 
-            datasetUrl: `https://console.apify.com/storage/datasets/${run.defaultDatasetId}`, 
+            datasetUrl: `https://console.apify.com/storage/datasets/${run.defaultDatasetId}`,
             mediaUrls,
             jsonFile: jsonFilename 
         };
