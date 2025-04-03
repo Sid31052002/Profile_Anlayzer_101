@@ -217,7 +217,6 @@ const scrapeInstagramProfile = async (profileUrl) => {
         await fs.writeFile(path.join(publicDir, textFileName), textSummary, 'utf8');
 
         const response = {
-            posts: processedPosts,
             textSummary: textFileName,
             textContent: textSummary
         };
